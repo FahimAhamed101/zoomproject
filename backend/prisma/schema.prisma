@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Admin user - separate from regular users
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptionPackages SubscriptionPackage[]
+
+  @@map("admins")
+}
+
+// Regular users
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  emailVerified     Boolean  @default(false)
+  emailVerificationToken String?
+  emailVerificationTokenExpiry DateTime?
+  passwordResetToken String?
+  passwordResetTokenExpiry DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Current active subscription
+  currentSubscriptionId String?
+  currentSubscription   UserSubscription? @relation("currentSubscription", fields: [currentSubscriptionId], references: [id])
+
+  // All subscription history
+  subscriptionHistory UserSubscription[] @relation("subscriptionHistory")
+
+  // User's files and folders
+  folders Folder[]
+  files   File[]
+
+  @@map("users")
+}
+
+// Subscription packages defined by admin (Free, Silver, Gold, Diamond)
+model SubscriptionPackage {
+  id                String   @id @default(cuid())
+  name              String   @unique // Free, Silver, Gold, Diamond
+  description       String?
+  maxFolders        Int      // Total folders allowed
+  maxNestingLevel   Int      // Max depth of folder hierarchy
+  allowedFileTypes  String[] // Image, Video, PDF, Audio
+  maxFileSize       Int      // Max file size in MB
+  totalFileLimit    Int      // Total files allowed in account
+  filesPerFolder    Int      // Max files in a single folder
+  price             Float    @default(0) // Monthly price
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  adminId String
+  admin   Admin  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  userSubscriptions UserSubscription[]
+
+  @@map("subscription_packages")
+}
+
+// User's subscription instance (tracks which package they're on and when)
+model UserSubscription {
+  id            String   @id @default(cuid())
+  startDate     DateTime @default(now())
+  endDate       DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId String
+  user   User   @relation("subscriptionHistory", fields: [userId], references: [id], onDelete: Cascade)
+
+  packageId String
+  package   SubscriptionPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  // This helps track which user-subscription is current
+  activeForUser User[] @relation("currentSubscription")
+
+  @@map("user_subscriptions")
+}
+
+// Folders
+model Folder {
+  id            String   @id @default(cuid())
+  name          String
+  nesting_level Int      @default(0) // Level 1: root, Level 2: subfolder, etc.
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Parent folder (for subfolders)
+  parentId String?
+  parent   Folder? @relation("subfolders", fields: [parentId], references: [id], onDelete: Cascade)
+  
+  // Child folders (subfolders)
+  subfolders Folder[] @relation("subfolders")
+
+  // Files in this folder
+  files File[]
+
+  @@map("folders")
+}
+
+// Files
+model File {
+  id            String   @id @default(cuid())
+  name          String
+  originalName  String   // Original file name uploaded
+  mimetype      String   // File MIME type
+  size          Int      // File size in bytes
+  path          String   // Path where file is stored
+  fileType      String   // Image, Video, PDF, Audio
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  folderId String
+  folder   Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@map("files")
+}
