@@ -122,9 +122,9 @@ flowchart TD
     C --> C4[Error Handler]
 
     B --> D[Route Layer]
-    D --> D1[/api/auth]
-    D --> D2[/api/admin]
-    D --> D3[/api/user]
+    D --> D1["/api/auth"]
+    D --> D2["/api/admin"]
+    D --> D3["/api/user"]
 
     D1 --> E1[Auth Controllers]
     D2 --> E2[Admin + Subscription Controllers]
